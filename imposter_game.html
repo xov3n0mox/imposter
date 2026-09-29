@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Imposter Game - Pass & Play Party Game</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        heading: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0B0F19',
+                            card: '#161F33',
+                            accent: '#6366F1',
+                            accentHover: '#4F46E5',
+                            rose: '#F43F5E',
+                            emerald: '#10B981',
+                            amber: '#F59E0B',
+                            purple: '#A855F7'
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                        'bounce-subtle': 'bounceSubtle 2s infinite',
+                        'card-flip': 'cardFlip 0.6s ease-out forwards'
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 15px rgba(99, 102, 241, 0.3)' },
+                            '50%': { boxShadow: '0 0 30px rgba(99, 102, 241, 0.7)' }
+                        },
+                        bounceSubtle: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-6px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0B0F19;
+            color: #F3F4F6;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .glass-panel {
+            background: rgba(22, 31, 51, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .word-blur {
+            filter: blur(12px);
+            transition: filter 0.3s ease;
+        }
+        .word-blur.revealed {
+            filter: blur(0);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center p-4 sm:p-6 overflow-x-hidden font-sans">
+
+    <script>
+        /* Web Audio API Sound Generator */
+        const AudioFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playClick() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            },
+            playReveal() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(520, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            },
+            playSpin() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150 + Math.random() * 200, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.05);
+            },
+            playFanfare() {
+                this.init();
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.1);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.1);
+                    osc.stop(this.ctx.currentTime + idx * 0.1 + 0.3);
+                });
+            }
+        };
+    </script>
+
+    <!-- Header / Branding -->
+    <header class="w-full max-w-xl text-center py-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-accent/10 border border-brand-accent/30 text-brand-accent text-xs font-semibold uppercase tracking-wider mb-2">
+            <i data-lucide="shield-alert" class="w-4 h-4"></i> Local Pass & Play Game
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold font-heading text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-rose-400 tracking-tight">
+            IMPOSTER GAME
+        </h1>
+        <div class="mt-1 text-xs font-medium text-indigo-300/80 tracking-wide">
+            Made by pk112
+        </div>
+    </header>
+
+    <!-- Main Dynamic Content Container -->
+    <main id="app-container" class="w-full max-w-xl my-auto py-2">
+        <!-- Content injected dynamically via JS -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-xl text-center py-4 text-xs text-gray-500 flex justify-between items-center px-2">
+        <span>Rules: Imposter gets an alternate word without knowing!</span>
+        <div class="flex items-center gap-3">
+            <span class="text-indigo-400/80 font-medium">Made by pk112</span>
+            <button id="btn-how-to-play" class="hover:text-indigo-400 underline transition-colors">How to Play</button>
+        </div>
+    </footer>
+
+    <!-- Rules Modal -->
+    <div id="modal-rules" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel p-6 rounded-2xl max-w-md w-full border border-indigo-500/20 text-gray-200 space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="text-xl font-bold font-heading text-indigo-400 flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-5 h-5"></i> How to Play
+                </h3>
+                <button onclick="closeRulesModal()" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="space-y-3 text-sm text-gray-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+                <p><strong class="text-white">1. Secret Word Distribution:</strong> Pass the device to each player. Everyone gets a secret word. Most players get the <span class="text-emerald-400 font-semibold">Majority Word</span> (e.g., "Apple"), while the <span class="text-rose-400 font-semibold">Imposter(s)</span> get an alternate word from the same category (e.g., "Pear").</p>
+                <div class="p-3 bg-indigo-950/40 border border-indigo-800/40 rounded-xl text-xs text-indigo-300">
+                    💡 <strong>Crucial Twist:</strong> The Imposter DOES NOT know they are the imposter! They think their word is the standard word.
+                </div>
+                <p><strong class="text-white">2. Directed Hints Phase:</strong> The app will randomly choose which player gives a hint next. Give a subtle, one-word or short hint about your assigned word.</p>
+                <p><strong class="text-white">3. Discussion & Reveal:</strong> Once everyone has given a hint, debate who had a slightly strange word hint! Vote and reveal the true Imposter(s).</p>
+            </div>
+            <button onclick="closeRulesModal()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg">Got It!</button>
+        </div>
+    </div>
+
+    <script>
+        /* Word Categories Database (Pairs: Majority Word & Imposter Word) */
+        const WORD_PACKS = {
+            Food: [
+                { majority: "Apple", imposter: "Pear" },
+                { majority: "Pizza", imposter: "Calzone" },
+                { majority: "Burger", imposter: "Sandwich" },
+                { majority: "Ice Cream", imposter: "Frozen Yogurt" },
+                { majority: "Sushi", imposter: "Sashimi" },
+                { majority: "Pancakes", imposter: "Waffles" },
+                { majority: "Taco", imposter: "Burrito" },
+                { majority: "Coffee", imposter: "Espresso" },
+                { majority: "Pasta", imposter: "Noodles" },
+                { majority: "Chocolate", imposter: "Fudge" }
+            ],
+            Animals: [
+                { majority: "Dog", imposter: "Wolf" },
+                { majority: "Cat", imposter: "Tiger" },
+                { majority: "Dolphin", imposter: "Whale" },
+                { majority: "Horse", imposter: "Donkey" },
+                { majority: "Penguin", imposter: "Puffin" },
+                { majority: "Frog", imposter: "Toad" },
+                { majority: "Eagle", imposter: "Hawk" },
+                { majority: "Bee", imposter: "Wasp" },
+                { majority: "Alligator", imposter: "Crocodile" },
+                { majority: "Rabbit", imposter: "Hare" }
+            ],
+            Places: [
+                { majority: "Beach", imposter: "Island" },
+                { majority: "Cinema", imposter: "Theater" },
+                { majority: "Hospital", imposter: "Clinic" },
+                { majority: "Library", imposter: "Bookstore" },
+                { majority: "Airport", imposter: "Train Station" },
+                { majority: "Hotel", imposter: "Resort" },
+                { majority: "Museum", imposter: "Art Gallery" },
+                { majority: "Bakery", imposter: "Café" },
+                { majority: "Park", imposter: "Garden" },
+                { majority: "Gym", imposter: "Sports Center" }
+            ],
+            Movies: [
+                { majority: "Harry Potter", imposter: "Percy Jackson" },
+                { majority: "Star Wars", imposter: "Star Trek" },
+                { majority: "Spider-Man", imposter: "Batman" },
+                { majority: "Titanic", imposter: "Avatar" },
+                { majority: "Shrek", imposter: "Madagascar" },
+                { majority: "Jurassic Park", imposter: "King Kong" },
+                { majority: "Toy Story", imposter: "A Bug's Life" },
+                { majority: "The Matrix", imposter: "Inception" }
+            ],
+            Objects: [
+                { majority: "Laptop", imposter: "Tablet" },
+                { majority: "Guitar", imposter: "Ukulele" },
+                { majority: "Clock", imposter: "Watch" },
+                { majority: "Sunglasses", imposter: "Eyeglasses" },
+                { majority: "Backpack", imposter: "Duffle Bag" },
+                { majority: "Pen", imposter: "Pencil" },
+                { majority: "Headphones", imposter: "Earbuds" },
+                { majority: "Sofa", imposter: "Armchair" }
+            ]
+        };
+
+        /* Game State */
+        const state = {
+            step: 'SETUP', // SETUP, PASS, VIEW, TURNS, DISCUSSION, REVEAL
+            playerNames: ['Player 1', 'Player 2', 'Player 3'],
+            imposterCount: 1,
+            selectedCategory: 'Food',
+            customPairs: [], // Custom word pairs input by user
+            
+            // Active Game Variables
+            players: [], // Array of { name, word, isImposter, hasGivenHint, votes }
+            majorityWord: '',
+            imposterWord: '',
+            currentPassIndex: 0,
+            activeTurnPlayerIndex: null,
+            turnsRemaining: [],
+            discussionSeconds: 120,
+            timerInterval: null
+        };
+
+        // UI Container Reference
+        const container = document.getElementById('app-container');
+
+        function initApp() {
+            document.getElementById('btn-how-to-play').onclick = openRulesModal;
+            render();
+        }
+
+        function openRulesModal() {
+            AudioFX.playClick();
+            document.getElementById('modal-rules').classList.remove('hidden');
+        }
+
+        function closeRulesModal() {
+            AudioFX.playClick();
+            document.getElementById('modal-rules').classList.add('hidden');
+        }
+
+        function render() {
+            switch(state.step) {
+                case 'SETUP':
+                    renderSetupView();
+                    break;
+                case 'PASS':
+                    renderPassView();
+                    break;
+                case 'VIEW':
+                    renderViewWordView();
+                    break;
+                case 'TURNS':
+                    renderTurnsView();
+                    break;
+                case 'DISCUSSION':
+                    renderDiscussionView();
+                    break;
+                case 'REVEAL':
+                    renderRevealView();
+                    break;
+            }
+            lucide.createIcons();
+        }
+
+        function renderSetupView() {
+            const categories = Object.keys(WORD_PACKS).concat(['Custom']);
+            
+            container.innerHTML = `
+                <div class="glass-panel p-5 sm:p-6 rounded-3xl shadow-2xl space-y-6 border border-indigo-500/20">
+                    <div class="text-center space-y-1">
+                        <h2 class="text-2xl font-bold font-heading text-white">Game Setup</h2>
+                        <p class="text-xs text-gray-400">Configure players & words for your single-device game</p>
+                    </div>
+
+                    <!-- Number of Players -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-sm">
+                            <label class="font-semibold text-gray-300">Players Count:</label>
+                            <span class="text-indigo-400 font-bold text-lg">${state.playerNames.length} Players</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="adjustPlayerCount(-1)" class="p-3 bg-gray-800 hover:bg-gray-700 active:scale-95 text-white rounded-xl font-bold flex-1 transition-all border border-gray-700">-</button>
+                            <button onclick="adjustPlayerCount(1)" class="p-3 bg-gray-800 hover:bg-gray-700 active:scale-95 text-white rounded-xl font-bold flex-1 transition-all border border-gray-700">+</button>
+                        </div>
+                    </div>
+
+                    <!-- Player Names Inputs -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-300 block">Player Names:</label>
+                        <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                            ${state.playerNames.map((name, i) => `
+                                <input type="text" value="${name}" onchange="updatePlayerName(${i}, this.value)" 
+                                    class="bg-gray-900/80 border border-gray-700/80 rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 transition-colors"
+                                    placeholder="Player ${i+1}">
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Imposter Count Selector -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-300 block">Number of Imposters:</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setImposterCount(1)" class="py-2.5 px-4 rounded-xl font-bold text-sm border transition-all ${state.imposterCount === 1 ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-800'}">
+                                1 Imposter
+                            </button>
+                            <button onclick="setImposterCount(2)" ${state.playerNames.length < 5 ? 'disabled title="Requires at least 5 players"' : ''} 
+                                class="py-2.5 px-4 rounded-xl font-bold text-sm border transition-all ${state.playerNames.length < 5 ? 'opacity-40 cursor-not-allowed bg-gray-800/20 border-gray-800 text-gray-600' : (state.imposterCount === 2 ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-800')}">
+                                2 Imposters ${state.playerNames.length < 5 ? '(5+ players)' : ''}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Category Selection -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-semibold text-gray-300 block">Word Category:</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            ${categories.map(cat => `
+                                <button onclick="selectCategory('${cat}')" class="py-2 px-3 rounded-xl text-xs font-bold border transition-all ${state.selectedCategory === cat ? 'bg-purple-600 border-purple-400 text-white shadow-md' : 'bg-gray-800/50 border-gray-700/60 text-gray-400 hover:bg-gray-800'}">
+                                    ${cat}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Custom Word Inputs if Custom chosen -->
+                    ${state.selectedCategory === 'Custom' ? `
+                        <div class="p-4 bg-purple-950/30 border border-purple-800/40 rounded-2xl space-y-3">
+                            <span class="text-xs font-bold text-purple-300 block uppercase tracking-wider">Custom Word Pair</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-[10px] text-gray-400">Majority Word</label>
+                                    <input id="custom-maj" type="text" placeholder="e.g. Coffee" class="w-full bg-gray-900 border border-purple-900/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-gray-400">Imposter Word</label>
+                                    <input id="custom-imp" type="text" placeholder="e.g. Tea" class="w-full bg-gray-900 border border-purple-900/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500">
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Start Game Button -->
+                    <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-600 to-rose-500 hover:from-indigo-600 hover:to-rose-600 text-white font-extrabold text-lg rounded-2xl shadow-xl hover:shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="play" class="w-5 h-5 fill-current"></i> Start Game
+                    </button>
+                </div>
+            `;
+        }
+
+        // Setup Handler Logic
+        function adjustPlayerCount(delta) {
+            AudioFX.playClick();
+            const newCount = state.playerNames.length + delta;
+            if (newCount >= 3 && newCount <= 10) {
+                if (delta > 0) {
+                    state.playerNames.push(`Player ${newCount}`);
+                } else {
+                    state.playerNames.pop();
+                    if (state.playerNames.length < 5 && state.imposterCount > 1) {
+                        state.imposterCount = 1;
+                    }
+                }
+                render();
+            }
+        }
+
+        function updatePlayerName(index, val) {
+            state.playerNames[index] = val.trim() || `Player ${index + 1}`;
+        }
+
+        function setImposterCount(count) {
+            AudioFX.playClick();
+            state.imposterCount = count;
+            render();
+        }
+
+        function selectCategory(cat) {
+            AudioFX.playClick();
+            state.selectedCategory = cat;
+            render();
+        }
+
+        function startGame() {
+            AudioFX.playClick();
+
+            // Select Word Pair
+            if (state.selectedCategory === 'Custom') {
+                const maj = document.getElementById('custom-maj')?.value.trim();
+                const imp = document.getElementById('custom-imp')?.value.trim();
+                if (!maj || !imp) {
+                    alert("Please enter both Majority and Imposter words for Custom mode!");
+                    return;
+                }
+                state.majorityWord = maj;
+                state.imposterWord = imp;
+            } else {
+                const pack = WORD_PACKS[state.selectedCategory];
+                const pair = pack[Math.floor(Math.random() * pack.length)];
+                state.majorityWord = pair.majority;
+                state.imposterWord = pair.imposter;
+            }
+
+            // Assign Imposters randomly
+            const totalPlayers = state.playerNames.length;
+            const imposterIndices = new Set();
+            while(imposterIndices.size < state.imposterCount) {
+                const randIdx = Math.floor(Math.random() * totalPlayers);
+                imposterIndices.add(randIdx);
+            }
+
+            // Construct Players List
+            state.players = state.playerNames.map((name, idx) => {
+                const isImp = imposterIndices.has(idx);
+                return {
+                    name,
+                    isImposter: isImp,
+                    word: isImp ? state.imposterWord : state.majorityWord,
+                    hasGivenHint: false,
+                    votes: 0
+                };
+            });
+
+            // Set up Turns Order (Random order for hint giving)
+            state.turnsRemaining = [...Array(totalPlayers).keys()].sort(() => Math.random() - 0.5);
+            state.currentPassIndex = 0;
+            state.step = 'PASS';
+            render();
+        }
+
+        function renderPassView() {
+            const player = state.players[state.currentPassIndex];
+            
+            container.innerHTML = `
+                <div class="glass-panel p-8 rounded-3xl shadow-2xl text-center space-y-8 border border-indigo-500/20 my-auto">
+                    <div class="w-20 h-20 bg-indigo-600/20 border border-indigo-500/40 rounded-full flex items-center justify-center mx-auto text-indigo-400 animate-bounce-subtle">
+                        <i data-lucide="smartphone" class="w-10 h-10"></i>
+                    </div>
+
+                    <div class="space-y-2">
+                        <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Pass Device To</span>
+                        <h2 class="text-3xl sm:text-4xl font-extrabold text-white font-heading">${player.name}</h2>
+                        <p class="text-xs text-gray-400 max-w-xs mx-auto">Make sure no other players are looking at the screen right now!</p>
+                    </div>
+
+                    <button onclick="revealSecretWord()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="eye" class="w-5 h-5"></i> I am ${player.name} - See Word
+                    </button>
+                </div>
+            `;
+        }
+
+        function revealSecretWord() {
+            AudioFX.playClick();
+            state.step = 'VIEW';
+            render();
+        }
+
+        function renderViewWordView() {
+            const player = state.players[state.currentPassIndex];
+
+            container.innerHTML = `
+                <div class="glass-panel p-8 rounded-3xl shadow-2xl text-center space-y-6 border border-indigo-500/30">
+                    <div class="space-y-1">
+                        <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Secret Word Card</span>
+                        <h2 class="text-2xl font-bold text-white font-heading">${player.name}</h2>
+                    </div>
+
+                    <!-- Secret Word Reveal Box -->
+                    <div class="p-6 bg-gray-900/90 border border-indigo-500/30 rounded-2xl space-y-3">
+                        <p class="text-xs text-gray-400">Your secret word is:</p>
+                        <div id="word-display" class="word-blur text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-300 py-2">
+                            ${player.word}
+                        </div>
+                        <p class="text-[11px] text-gray-500 italic">Hold or click reveal button to unblur</p>
+                    </div>
+
+                    <button id="btn-toggle-blur" onclick="toggleBlur()" class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 rounded-xl border border-gray-700 transition-all flex items-center justify-center gap-1.5">
+                        <i data-lucide="eye" class="w-4 h-4"></i> Show / Hide Word
+                    </button>
+
+                    <div class="p-3 bg-amber-950/30 border border-amber-800/40 rounded-xl text-left text-xs text-amber-200/80 flex items-start gap-2">
+                        <i data-lucide="info" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                        <span>Remember: Give subtle hints later. Do not disclose your word directly!</span>
+                    </div>
+
+                    <button onclick="nextPassPlayer()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="check-circle" class="w-5 h-5"></i> I've Seen My Word - Pass
+                    </button>
+                </div>
+            `;
+        }
+
+        function toggleBlur() {
+            AudioFX.playClick();
+            const display = document.getElementById('word-display');
+            display?.classList.toggle('revealed');
+        }
+
+        function nextPassPlayer() {
+            AudioFX.playClick();
+            state.currentPassIndex++;
+            if (state.currentPassIndex < state.players.length) {
+                state.step = 'PASS';
+            } else {
+                // All players saw their words, proceed to directed turns
+                state.step = 'TURNS';
+            }
+            render();
+        }
+
+        function renderTurnsView() {
+            const allHintsGiven = state.turnsRemaining.length === 0 && state.activeTurnPlayerIndex === null;
+
+            if (allHintsGiven) {
+                // Auto switch to Discussion
+                state.step = 'DISCUSSION';
+                render();
+                return;
+            }
+
+            const activePlayer = state.activeTurnPlayerIndex !== null ? state.players[state.activeTurnPlayerIndex] : null;
+
+            container.innerHTML = `
+                <div class="glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-6 border border-indigo-500/20">
+                    <div class="space-y-1">
+                        <span class="text-xs uppercase tracking-widest text-indigo-400 font-bold">Hint Giving Phase</span>
+                        <h2 class="text-2xl font-bold text-white font-heading">App Choice Turn</h2>
+                    </div>
+
+                    ${activePlayer ? `
+                        <!-- Active Player Turn Card -->
+                        <div class="p-6 bg-gradient-to-b from-indigo-950/60 to-purple-950/40 border-2 border-indigo-500/50 rounded-2xl space-y-3 animate-pulse-glow">
+                            <span class="text-xs font-bold text-indigo-300 uppercase tracking-widest">IT IS YOUR TURN</span>
+                            <h3 class="text-3xl font-extrabold text-white">${activePlayer.name}</h3>
+                            <p class="text-xs text-indigo-200">Give a one-word or brief hint describing your word out loud to the group!</p>
+                        </div>
+
+                        <button onclick="confirmHintGiven()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="check" class="w-5 h-5"></i> Hint Given - Next Player
+                        </button>
+                    ` : `
+                        <!-- Selector Spin Button -->
+                        <div class="p-8 bg-gray-900/60 border border-gray-800 rounded-2xl space-y-4">
+                            <i data-lucide="dices" class="w-12 h-12 text-indigo-400 mx-auto animate-bounce-subtle"></i>
+                            <p class="text-sm text-gray-300">Tap below to let the app randomly pick who must give a hint next!</p>
+                            
+                            <button onclick="spinNextTurnPlayer()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-lg rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                                <i data-lucide="sparkles" class="w-5 h-5"></i> Pick Next Player
+                            </button>
+                        </div>
+                    `}
+
+                    <!-- Hint Status Tracker -->
+                    <div class="space-y-2 pt-2 border-t border-gray-800">
+                        <span class="text-xs font-semibold text-gray-400 block text-left">Players Status:</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            ${state.players.map(p => `
+                                <div class="px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between border ${p.hasGivenHint ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300' : 'bg-gray-900/40 border-gray-800 text-gray-400'}">
+                                    <span>${p.name}</span>
+                                    ${p.hasGivenHint ? '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>' : '<i data-lucide="clock" class="w-4 h-4 text-gray-500"></i>'}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function spinNextTurnPlayer() {
+            if (state.turnsRemaining.length === 0) return;
+            
+            AudioFX.playSpin();
+            // Pick next random player from remaining
+            const nextIdx = state.turnsRemaining.pop();
+            state.activeTurnPlayerIndex = nextIdx;
+            render();
+        }
+
+        function confirmHintGiven() {
+            AudioFX.playClick();
+            if (state.activeTurnPlayerIndex !== null) {
+                state.players[state.activeTurnPlayerIndex].hasGivenHint = true;
+                state.activeTurnPlayerIndex = null;
+            }
+            render();
+        }
+
+        function renderDiscussionView() {
+            container.innerHTML = `
+                <div class="glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-6 border border-indigo-500/20">
+                    <div class="space-y-1">
+                        <span class="text-xs uppercase tracking-widest text-rose-400 font-bold">Discussion Phase</span>
+                        <h2 class="text-2xl font-bold text-white font-heading">Find the Imposter!</h2>
+                    </div>
+
+                    <div class="p-4 bg-gray-900/80 border border-gray-800 rounded-2xl space-y-2">
+                        <p class="text-xs text-gray-400">All hints have been given. Discuss whose hint felt slightly out of place or mismatched!</p>
+                    </div>
+
+                    <!-- Voting Selector -->
+                    <div class="space-y-3 text-left">
+                        <label class="text-xs font-bold text-gray-300 uppercase tracking-wider block">Group Vote / Guess Imposter:</label>
+                        <div class="space-y-2">
+                            ${state.players.map((p, idx) => `
+                                <button onclick="castVote(${idx})" class="w-full p-3 bg-gray-900/60 hover:bg-rose-950/40 border border-gray-800 hover:border-rose-700/50 rounded-xl text-left font-semibold text-sm text-gray-200 flex items-center justify-between transition-all group">
+                                    <span class="flex items-center gap-2">
+                                        <i data-lucide="user" class="w-4 h-4 text-gray-500 group-hover:text-rose-400"></i> ${p.name}
+                                    </span>
+                                    <span class="text-xs text-gray-500 group-hover:text-rose-300">Accuse & Reveal</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <button onclick="revealResults()" class="w-full py-4 bg-gradient-to-r from-rose-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white font-extrabold text-base rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="search" class="w-5 h-5"></i> Reveal True Imposters
+                    </button>
+                </div>
+            `;
+        }
+
+        function castVote(playerIdx) {
+            AudioFX.playClick();
+            state.players[playerIdx].votes++;
+            revealResults();
+        }
+
+        function renderRevealView() {
+            AudioFX.playFanfare();
+            const imposters = state.players.filter(p => p.isImposter);
+
+            container.innerHTML = `
+                <div class="glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl text-center space-y-6 border border-rose-500/30">
+                    <div class="space-y-1">
+                        <span class="text-xs uppercase tracking-widest text-rose-400 font-bold">Game Over</span>
+                        <h2 class="text-3xl font-extrabold text-white font-heading">The Reveal!</h2>
+                    </div>
+
+                    <!-- Imposter Identity Card -->
+                    <div class="p-6 bg-gradient-to-b from-rose-950/60 to-purple-950/50 border-2 border-rose-500/60 rounded-2xl space-y-3">
+                        <span class="text-xs font-bold text-rose-300 uppercase tracking-widest block">The Imposter(s) Was:</span>
+                        <div class="text-2xl sm:text-3xl font-black text-white">
+                            ${imposters.map(i => i.name).join(', ')}
+                        </div>
+                    </div>
+
+                    <!-- Word Words Comparison -->
+                    <div class="grid grid-cols-2 gap-3 text-left">
+                        <div class="p-4 bg-emerald-950/30 border border-emerald-800/40 rounded-2xl space-y-1">
+                            <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">Majority Word</span>
+                            <span class="text-lg font-bold text-white">${state.majorityWord}</span>
+                        </div>
+                        <div class="p-4 bg-rose-950/30 border border-rose-800/40 rounded-2xl space-y-1">
+                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider block">Imposter Word</span>
+                            <span class="text-lg font-bold text-white">${state.imposterWord}</span>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="space-y-2 pt-2">
+                        <button onclick="playAgainSamePlayers()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-base rounded-2xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="rotate-ccw" class="w-5 h-5"></i> Play Again (Same Players)
+                        </button>
+                        <button onclick="returnToSetup()" class="w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-sm rounded-xl border border-gray-700 transition-all">
+                            Back to Game Setup
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function revealResults() {
+            state.step = 'REVEAL';
+            render();
+        }
+
+        function playAgainSamePlayers() {
+            AudioFX.playClick();
+            // Reset player states but keep names & config
+            startGame();
+        }
+
+        function returnToSetup() {
+            AudioFX.playClick();
+            state.step = 'SETUP';
+            render();
+        }
+
+        // Initialize on Load
+        window.onload = initApp;
+    </script>
+</body>
+</html>
